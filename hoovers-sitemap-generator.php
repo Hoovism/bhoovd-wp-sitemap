@@ -72,6 +72,14 @@ function hoovers_sitemap_generator_display() {
 	else if($page == 'sitemapstatic') {
 		hoovers_sitemap_header();
 
+
+		// pages - add the home page and other static stuffs
+		echo " <url>\n";
+		echo "  <loc>".get_site_url()."</loc>\n";
+		echo "  <changefreq>daily</changefreq>\n";
+		echo "  <priority>0.9</priority>\n";
+		echo " </url>\n";
+
 		$query = new WP_Query(array(
 				'post_type' => 'page',
 				'orderby' => 'date',
