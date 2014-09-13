@@ -131,7 +131,14 @@ function hoovers_sitemap_comment() {
 	echo " <!--                                                     -->\n";
 }
 
+function hoovers_sitemap_http_headers() {
+	header("HTTP/1.1 200 OK");
+	header( 'Content-Type: application/xml' );
+}
+
 function hoovers_sitemap_header() {
+	hoovers_sitemap_http_headers();
+
 	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 	echo "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n";
 	echo " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n";
@@ -142,6 +149,8 @@ function hoovers_sitemap_header() {
 }
 
 function hoovers_sitemap_index_header() {
+	hoovers_sitemap_http_headers();
+
 	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 	echo "<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
 
