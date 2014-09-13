@@ -3,7 +3,9 @@
         Hoover's Sitemap Generator
 *********************************************/
 
-require_once('./wp-blog-header.php');
+
+// Update this for your installation
+require_once('../wp-blog-header.php');
 
 header("HTTP/1.1 200 OK");
 header( 'Content-Type: application/xml' );
