@@ -46,7 +46,7 @@ function hoovers_sitemap_generator_display() {
 				'orderby' => 'date',
 				'order' => 'ASC',
 				'paged' => $smp ? 
-						$smp : 12,
+						$smp : 1,
 				'posts_per_page' => 5000
 				)
 			);
