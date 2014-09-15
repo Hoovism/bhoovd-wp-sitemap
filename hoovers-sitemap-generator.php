@@ -6,7 +6,7 @@
  * Description: Hoover's XML Sitemap Generator for Wordpress
  * Author:      Matthew Hoover
  * Author URI:  http://www.hoovism.com
- * Version:     1.0
+ * Version:     1.0.1
  * Text Domain: hoovers-sitemap-generator
  */
 
@@ -33,8 +33,23 @@ function hoovers_sitemap_generator_query_vars($vars) {
 }
 
 function hoovers_sitemap_generator_display() {
+	// determine which part of the sitemap we need via pagename
 	$page = get_query_var("pagename");
+
+	// $smp needs to be renamed to something like 'page'.
+	// This used to be a selector for both the type of request
+	// (sitemap index, static sitemap, sitemap) and the page number
 	$smp = get_query_var('smp');
+
+
+	$post_priority = 0.8;
+
+	// if true, priorities for posts in the sitemap will be lowered
+	// as they age
+	$post_priority_decay = true;
+
+	// a higher number here means the priority decay is slower
+	$priority_decay_constant = 365;
 
 
 	if($page == 'sitemap') {
@@ -56,11 +71,22 @@ function hoovers_sitemap_generator_display() {
 			$permalink = get_permalink();
 			$modified_date = the_modified_date('Y-m-d\TH:i:s', '', '', false).
 						w3c_tz_str(get_option('gmt_offset'));
+
+			if($post_priority_decay) {
+				$modified_date_seconds = the_modified_date('U', '', '', false);
+				$age_days = floor((time() - $modified_date_seconds) / 86400);
+				$priority = (($post_priority - 0.01) / (($age_days / $priority_decay_constant) + 1)) + 0.01;
+				$priority = number_format($priority, 2, ".", "");
+			}
+			else {
+				$priority = $post_priority;
+			}
+
 			echo " <url>\n";
 			echo "  <loc>".$permalink."</loc>\n";
 			echo "  <lastmod>".$modified_date."</lastmod>\n";
 			echo "  <changefreq>monthly</changefreq>\n";
-			echo "  <priority>0.75</priority>\n";
+			echo "  <priority>".$priority."</priority>\n";
 			echo " </url>\n";
 
 		endwhile;
@@ -140,8 +166,8 @@ function hoovers_sitemap_comment() {
 }
 
 function hoovers_sitemap_http_headers() {
-	header("HTTP/1.1 200 OK");
-	header( 'Content-Type: application/xml' );
+	header('HTTP/1.1 200 OK');
+	header('Content-Type: application/xml');
 }
 
 function hoovers_sitemap_header() {
@@ -194,9 +220,6 @@ function leading_zero($str, $digits=2) {
 
 	return $str;
 }
-
-
-
 
 
 register_activation_hook(__FILE__, 'hoovers_sitemap_generator_activate');
