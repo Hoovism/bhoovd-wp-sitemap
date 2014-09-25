@@ -6,7 +6,7 @@
  * Description: Hoover's XML Sitemap Generator for Wordpress
  * Author:      Matthew Hoover
  * Author URI:  http://www.hoovism.com
- * Version:     1.0.1
+ * Version:     1.1
  * Text Domain: hoovers-sitemap-generator
  */
 
@@ -24,6 +24,7 @@ function hoovers_sitemap_generator_deactivate() {
 function hoovers_sitemap_generator_rules() {
 	add_rewrite_rule("sitemap/([0-9]|[0-9]+)/?$", 'index.php?pagename=sitemap&smp=$matches[1]', "top");
 	add_rewrite_rule('sitemap/static/?$', 'index.php?pagename=sitemapstatic', 'top');
+	add_rewrite_rule('sitemap/archive/?$', 'index.php?pagename=sitemaparchive', 'top');
 	add_rewrite_rule('sitemap/?$', 'index.php?pagename=sitemapindex', 'top');
 }
 
@@ -33,6 +34,8 @@ function hoovers_sitemap_generator_query_vars($vars) {
 }
 
 function hoovers_sitemap_generator_display() {
+	global $wpdb, $wp_locale;
+
 	// determine which part of the sitemap we need via pagename
 	$page = get_query_var("pagename");
 
@@ -41,15 +44,31 @@ function hoovers_sitemap_generator_display() {
 	// (sitemap index, static sitemap, sitemap) and the page number
 	$smp = get_query_var('smp');
 
+	// sitemap priority for posts in the last month
+	$post_priority_1m = 0.80;
+	$post_cf_1m = "daily";
 
-	$post_priority = 0.8;
+	// sitemap priority for the posts in the last 3 months
+	$post_priority_3m = 0.79;
+	$post_cf_3m = "daily";
 
-	// if true, priorities for posts in the sitemap will be lowered
-	// as they age
-	$post_priority_decay = true;
+	// sitemap priority for the posts in the last 6 months
+	$post_priority_6m = 0.78;
+	$post_cf_6m = "weekly";
 
-	// a higher number here means the priority decay is slower
-	$priority_decay_constant = 365;
+	// sitemap priority for the posts in the last 12 months
+	$post_priority_12m = 0.77;
+	$post_cf_12m = "weekly";
+
+	// sitemap priority for all other posts
+	$post_priority_gt12m = 0.75;
+	$post_cf_gt12m = "monthly";
+
+	// priority for monthly archives
+	$monthly_priority = 0.2;
+
+	// priority for pages
+	$page_priority = 0.5;
 
 
 	if($page == 'sitemap') {
@@ -72,20 +91,37 @@ function hoovers_sitemap_generator_display() {
 			$modified_date = the_modified_date('Y-m-d\TH:i:s', '', '', false).
 						w3c_tz_str(get_option('gmt_offset'));
 
-			if($post_priority_decay) {
-				$modified_date_seconds = the_modified_date('U', '', '', false);
-				$age_days = floor((time() - $modified_date_seconds) / 86400);
-				$priority = (($post_priority - 0.01) / (($age_days / $priority_decay_constant) + 1)) + 0.01;
-				$priority = number_format($priority, 2, ".", "");
+
+			$pdm = get_the_time('m');
+			$pdy = get_the_time('Y');
+
+			if(hoovers_within_prev($pdy, $pdm, $months=1)) {
+				$priority = $post_priority_1m;
+				$changefreq = $post_cf_1m;
+			}
+			else if(hoovers_within_prev($pdy, $pdm, $months=3)) {
+				$priority = $post_priority_3m;
+				$changefreq = $post_cf_3m;
+			}
+			else if(hoovers_within_prev($pdy, $pdm, $months=6)) {
+				$priority = $post_priority_6m;
+				$changefreq = $post_cf_6m;
+			}
+			else if(hoovers_within_prev($pdy, $pdm, $months=12)) {
+				$priority = $post_priority_12m;
+				$changefreq = $post_cf_12m;
 			}
 			else {
-				$priority = $post_priority;
+				$priority = $post_priority_gt12m;
+				$changefreq = $post_cf_gt12m;
 			}
+
+
 
 			echo " <url>\n";
 			echo "  <loc>".$permalink."</loc>\n";
 			echo "  <lastmod>".$modified_date."</lastmod>\n";
-			echo "  <changefreq>monthly</changefreq>\n";
+			echo "  <changefreq>".$changefreq."</changefreq>\n";
 			echo "  <priority>".$priority."</priority>\n";
 			echo " </url>\n";
 
@@ -122,7 +158,7 @@ function hoovers_sitemap_generator_display() {
 			echo "  <loc>".$permalink."</loc>\n";
 			echo "  <lastmod>".$modified_date."</lastmod>\n";
 			echo "  <changefreq>weekly</changefreq>\n";
-			echo "  <priority>0.5</priority>\n";
+			echo "  <priority>".$page_priority."</priority>\n";
 			echo " </url>\n";
 
 		endwhile;
@@ -145,6 +181,10 @@ function hoovers_sitemap_generator_display() {
 		echo "  <loc>".get_site_url()."/sitemap/static/</loc>\n";
 		echo " </sitemap>\n";
 
+		echo " <sitemap>\n";
+		echo "  <loc>".get_site_url()."/sitemap/archive/</loc>\n";
+		echo " </sitemap>\n";
+
 		for($i = 1; $i <= $query->max_num_pages; $i++) {
 			echo " <sitemap>\n";
 			echo "  <loc>".get_site_url()."/sitemap/".$i."/</loc>\n";
@@ -154,6 +194,91 @@ function hoovers_sitemap_generator_display() {
 		hoovers_sitemap_index_footer();
 		exit();
 	}
+	else if($page == 'sitemaparchive') {
+		hoovers_sitemap_header();
+
+		$where = apply_filters( 'getarchives_where', "WHERE post_type = 'post' AND post_status = 'publish'", array() );
+
+
+		$last_changed = wp_cache_get( 'last_changed', 'posts' );
+		if ( ! $last_changed ) {
+			$last_changed = microtime();
+			wp_cache_set( 'last_changed', $last_changed, 'posts' );
+		}
+
+		$query = "SELECT YEAR(post_date) AS `year`, MONTH(post_date) AS `month`, count(ID) as posts FROM $wpdb->posts $where GROUP BY YEAR(post_date), MONTH(post_date) ORDER BY post_date";
+		$key = md5( $query );
+		$key = "wp_get_archives:$key:$last_changed";
+
+		if ( ! $results = wp_cache_get( $key, 'posts' ) ) {
+			$results = $wpdb->get_results( $query );
+			wp_cache_set( $key, $results, 'posts' );
+		}
+		if ( $results ) {
+
+			foreach ( (array) $results as $result ) {
+				$url = get_month_link( $result->year, $result->month );
+
+
+				echo " <url>\n";
+				echo "  <loc>".$url."</loc>\n";
+				echo "  <changefreq>".(hoovers_within_prev($result->year, $result->month, 1) ? "daily" : (hoovers_within_prev($result->year, $result->month, 6) ? "weekly" : "monthly"))."</changefreq>\n";
+				echo "  <priority>".$monthly_priority."</priority>\n";
+				echo " </url>\n";
+			}
+		}
+
+
+		hoovers_sitemap_footer();
+		exit();
+	}
+
+}
+
+function hoovers_within_prev($y, $m, $months=6, $years=0, $include_earliest=false) {
+
+	$cy = date('Y');
+	$cm = date('m');
+
+	$earliest_year = $cy - $years;
+
+	// correct for excessive use of months
+	while($months >= 12) {
+		$earliest_year--;
+		$months = $months - 12;
+	}
+
+	// if we have more months left than the 
+	// current month of the year, fix it
+	if($months >= $cm) {
+		$earliest_year--;
+		$months = $months - $cm;
+		$earliest_month = 12 - $months;
+	}
+	else {
+		$earliest_month = $cm - $months;
+	}
+
+
+	// if the year of the post is after the earliest year
+	// return true, return false if it is less than the earliest
+	// year
+	if($y > $earliest_year) {
+		return true;
+	}
+	else if($y < $earliest_year) {
+		return false;
+	}
+
+	// check if the given month should be included
+	if($include_earliest && $m >= $earliest_month) {
+		return true;
+	}
+	else if(!$include_earliest && $m > $earliest_month) {
+		return true;
+	}
+
+	return false;
 
 }
 
