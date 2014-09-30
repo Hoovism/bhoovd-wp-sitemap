@@ -24,6 +24,7 @@ function hoovers_sitemap_generator_deactivate() {
 
 }
 
+
 function hoovers_sitemap_generator_rules() {
 
 	add_rewrite_rule("sitemap/([0-9]|[0-9]+)/?$", 'index.php?pagename=sitemap&smp=$matches[1]', "top");
@@ -34,12 +35,14 @@ function hoovers_sitemap_generator_rules() {
 
 }
 
+
 function hoovers_sitemap_generator_query_vars($vars) {
 
 	$vars[] = 'smp';
 	return $vars;
 
 }
+
 
 function hoovers_sitemap_generator_display() {
 
@@ -294,10 +297,11 @@ function hoovers_sitemap_generator_display() {
 
 }
 
+
 function hoovers_within_prev($y, $m, $months=6, $years=0, $include_earliest=false) {
 
-	$cy = date('Y');
-	$cm = date('m');
+	$cy = current_time('Y');
+	$cm = current_time('m');
 
 	$earliest_year = $cy - $years;
 
@@ -355,6 +359,7 @@ function hoovers_within_prev($y, $m, $months=6, $years=0, $include_earliest=fals
 
 }
 
+
 function hoovers_sitemap_comment() {
 
 	// Please don't delete this; I will be sad.  :'(
@@ -365,6 +370,7 @@ function hoovers_sitemap_comment() {
 
 }
 
+
 function hoovers_sitemap_http_headers() {
 
 	// rather than just assume we're using HTTP/1.1,
@@ -372,9 +378,10 @@ function hoovers_sitemap_http_headers() {
 	header($_SERVER["SERVER_PROTOCOL"].' 200 OK');
 	header('Content-Type: application/xml');
 
-
+	hoovers_sitemap_cache_headers();
 
 }
+
 
 function hoovers_sitemap_header() {
 
@@ -390,6 +397,7 @@ function hoovers_sitemap_header() {
 
 }
 
+
 function hoovers_sitemap_index_header() {
 
 	hoovers_sitemap_http_headers();
@@ -401,17 +409,28 @@ function hoovers_sitemap_index_header() {
 
 }
 
+
 function hoovers_sitemap_footer() {
 
 	echo "</urlset>";
 
 }
 
+
 function hoovers_sitemap_index_footer() {
 
 	echo "</sitemapindex>";
 
 }
+
+
+function hoovers_sitemap_cache_headers() {
+
+	header("Cache-Control: public,max-age=21600,s-maxage=43200");
+	header("Expires: ".gmdate("D, d M Y H:i:s", time() + 43200) . " GMT");
+
+}
+
 
 function w3c_tz_str($dec_offset) {
 
@@ -433,6 +452,7 @@ function w3c_tz_str($dec_offset) {
 	return $sign.leading_zero($hours).":".leading_zero($minutes);
 
 }
+
 
 function leading_zero($str, $digits=2) {
 
