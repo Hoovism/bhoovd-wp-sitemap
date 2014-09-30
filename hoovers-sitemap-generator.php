@@ -3,13 +3,12 @@
 /**
  * Plugin Name: Hoover's Sitemap Generator
  * Plugin URI:  http://wpsitemap.hoovism.com
- * Description: Hoover's XML Sitemap Generator for Wordpress
+ * Description: Hoover's XML Sitemap Generator for Wordpress.  Note that this plugin only works when 'pretty' permalinks are enabled.
  * Author:      Matthew Hoover
  * Author URI:  http://www.hoovism.com
  * Version:     1.1
  * Text Domain: hoovers-sitemap-generator
  */
-
 
 function hoovers_sitemap_generator_activate() {
 
@@ -28,6 +27,7 @@ function hoovers_sitemap_generator_deactivate() {
 function hoovers_sitemap_generator_rules() {
 
 	add_rewrite_rule("sitemap/([0-9]|[0-9]+)/?$", 'index.php?pagename=sitemap&smp=$matches[1]', "top");
+	add_rewrite_rule("sitemap/category/?$", 'index.php?pagename=sitemapcategory', 'top');
 	add_rewrite_rule('sitemap/static/?$', 'index.php?pagename=sitemapstatic', 'top');
 	add_rewrite_rule('sitemap/archive/?$', 'index.php?pagename=sitemaparchive', 'top');
 	add_rewrite_rule('sitemap/?$', 'index.php?pagename=sitemapindex', 'top');
@@ -78,6 +78,10 @@ function hoovers_sitemap_generator_display() {
 
 	// priority for pages
 	$page_priority = 0.5;
+
+	// category priority
+	$category_priority = 0.1;
+	$category_changefreq = "weekly";
 
 
 	if($page == 'sitemap') {
@@ -147,6 +151,28 @@ function hoovers_sitemap_generator_display() {
 		exit();
 
 	}
+	else if($page == 'sitemapcategory') {
+
+		hoovers_sitemap_header();
+
+		// get the categories
+		$categories = get_categories();
+
+		foreach($categories AS $category) {
+
+			echo " <url>\n";
+			echo "  <loc>".get_category_link($category->term_id)."</loc>\n";
+			echo "  <changefreq>".$category_changefreq."</changefreq>\n";
+			echo "  <priority>".$category_priority."</priority>\n";
+			echo " </url>\n";
+
+		}
+
+
+		hoovers_sitemap_footer();
+		exit();
+
+	}
 	else if($page == 'sitemapstatic') {
 
 		hoovers_sitemap_header();
@@ -155,7 +181,7 @@ function hoovers_sitemap_generator_display() {
 		echo " <url>\n";
 		echo "  <loc>".get_site_url()."</loc>\n";
 		echo "  <changefreq>daily</changefreq>\n";
-		echo "  <priority>0.9</priority>\n";
+		echo "  <priority>1.0</priority>\n";
 		echo " </url>\n";
 
 		$query = new WP_Query(array(
@@ -180,38 +206,6 @@ function hoovers_sitemap_generator_display() {
 		endwhile;
 
 		hoovers_sitemap_footer();
-		exit();
-
-	}
-	else if($page == 'sitemapindex') {
-
-		hoovers_sitemap_index_header();
-
-		$query = new WP_Query(array(
-					'post_type' => 'post',
-					'orderby' => 'date',
-					'order' => 'ASC',
-					'posts_per_page' => 5000
-					)
-				);
-
-		echo " <sitemap>\n";
-		echo "  <loc>".get_site_url()."/sitemap/static/</loc>\n";
-		echo " </sitemap>\n";
-
-		echo " <sitemap>\n";
-		echo "  <loc>".get_site_url()."/sitemap/archive/</loc>\n";
-		echo " </sitemap>\n";
-
-		for($i = 1; $i <= $query->max_num_pages; $i++) {
-
-			echo " <sitemap>\n";
-			echo "  <loc>".get_site_url()."/sitemap/".$i."/</loc>\n";
-			echo " </sitemap>\n";
-
-		}
-
-		hoovers_sitemap_index_footer();
 		exit();
 
 	}
@@ -260,6 +254,43 @@ function hoovers_sitemap_generator_display() {
 		exit();
 
 	}
+	else if($page == 'sitemapindex') {
+
+		hoovers_sitemap_index_header();
+
+		$query = new WP_Query(array(
+					'post_type' => 'post',
+					'orderby' => 'date',
+					'order' => 'ASC',
+					'posts_per_page' => 5000
+					)
+				);
+
+		echo " <sitemap>\n";
+		echo "  <loc>".get_site_url()."/sitemap/static/</loc>\n";
+		echo " </sitemap>\n";
+
+		echo " <sitemap>\n";
+		echo "  <loc>".get_site_url()."/sitemap/archive/</loc>\n";
+		echo " </sitemap>\n";
+
+		echo " <sitemap>\n";
+		echo "  <loc>".get_site_url()."/sitemap/category/</loc>\n";
+		echo " </sitemap>\n";
+
+		for($i = 1; $i <= $query->max_num_pages; $i++) {
+
+			echo " <sitemap>\n";
+			echo "  <loc>".get_site_url()."/sitemap/".$i."/</loc>\n";
+			echo " </sitemap>\n";
+
+		}
+
+		hoovers_sitemap_index_footer();
+		exit();
+
+	}
+
 
 }
 
@@ -336,8 +367,12 @@ function hoovers_sitemap_comment() {
 
 function hoovers_sitemap_http_headers() {
 
-	header('HTTP/1.1 200 OK');
+	// rather than just assume we're using HTTP/1.1,
+	// get the protocol in use (bug fix for some systems)
+	header($_SERVER["SERVER_PROTOCOL"].' 200 OK');
 	header('Content-Type: application/xml');
+
+
 
 }
 
